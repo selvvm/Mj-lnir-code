@@ -1,0 +1,5 @@
+openai==2.37.0
+python-dotenv==1.2.2
+click==8.4.0
+rich==15.0.0
+prompt_toolkit==3.0.52
