@@ -18,8 +18,8 @@ from rich.panel import Panel
 from rich.spinner import Spinner
 from rich.text import Text
 
-from client.llm_client import LLMClient
-from client.response import EventType
+from agent.agent import Agent
+from agent.events import AgentEventType
 
 load_dotenv()
 
@@ -56,13 +56,9 @@ async def read_input(history: InMemoryHistory) -> str | None:
       return await app.run_async()
 
 
-async def render_response(client: LLMClient, messages: list[dict[str, str]]) -> tuple[str, bool]:
-      """Stream the assistant reply behind a spinner, then render it as markdown.
-
-      Returns (reply_text, errored).
-      """
-      acc = ""
-      errored = False
+async def render_response(agent: Agent, user_input: str) -> None:
+      """Stream the agent's reply behind a spinner, then render it as markdown."""
+      reply = ""
       error_renderable: Text | None = None
 
       with Live(
@@ -72,35 +68,33 @@ async def render_response(client: LLMClient, messages: list[dict[str, str]]) -> 
             transient=True,
       ):
             try:
-                  stream = await client.chat_completion(messages, stream=True)
-                  async for event in stream:
-                        if event.type is EventType.TEXT_DELTA:
-                              acc += event.text_delta or ""
-                        elif event.type is EventType.RATE_LIMIT:
-                              errored = True
-                              error_renderable = Text(f"⚠  Rate limited: {event.error}", style="yellow")
-                        elif event.type is EventType.ERROR:
-                              errored = True
-                              error_renderable = Text(f"✗  Error: {event.error}", style="red")
+                  async for event in agent.run(user_input):
+                        if event.type is AgentEventType.TEXT_DELTA:
+                              reply += event.data.get("text", "")
+                        elif event.type is AgentEventType.TEXT_COMPLETE:
+                              reply = event.data.get("text", reply)
+                        elif event.type is AgentEventType.AGENT_ERROR:
+                              kind = event.data.get("kind", "unknown")
+                              color = "yellow" if kind in ("rate_limit", "network") else "red"
+                              error_renderable = Text(
+                                    f"✗  [{kind}] {event.data.get('error')}", style=color
+                              )
             except Exception as exc:
-                  errored = True
                   error_renderable = Text(f"✗  Error: {exc}", style="red")
 
-      if errored and error_renderable is not None:
+      if error_renderable is not None:
             console.print(error_renderable)
       else:
-            console.print(Group(Text("✻ DeepSeek", style="bold green"), Markdown(acc)))
-      return acc, errored
+            console.print(Group(Text("✻ DeepSeek", style="bold green"), Markdown(reply)))
 
 
 async def chat_loop() -> None:
-      """Run an interactive multi-turn chat session against DeepSeek."""
-      client = LLMClient()
+      """Run an interactive multi-turn chat session through the Agent."""
+      agent = Agent()
       history: InMemoryHistory = InMemoryHistory()
-      messages: list[dict[str, str]] = []
 
       console.print(Panel(
-            "[bold]✻ Chat with DeepSeek[/bold]\n"
+            "[bold]✻ Mjolnir coding agent[/bold]\n"
             "[dim]Type a message and press Enter · ↑↓ for history · 'exit' or Ctrl+C to quit[/dim]",
             title="DeepSeek CLI",
             title_align="left",
@@ -120,16 +114,10 @@ async def chat_loop() -> None:
                         continue
                   if user_input.lower() in {"exit", "quit"}:
                         break
-
-                  messages.append({"role": "user", "content": user_input})
-                  reply, errored = await render_response(client, messages)
-                  if errored:
-                        messages.pop()
-                  else:
-                        messages.append({"role": "assistant", "content": reply})
+                  await render_response(agent, user_input)
                   console.print()
       finally:
-            await client.close()
+            await agent.close()
             console.print("[dim]Goodbye![/dim]")
 
 

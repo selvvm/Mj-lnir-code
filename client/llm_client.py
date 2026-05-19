@@ -1,8 +1,8 @@
 import os
-from openai import AsyncOpenAI, RateLimitError
+from openai import AsyncOpenAI, RateLimitError, APIConnectionError, OpenAIError
 from typing import Any, AsyncGenerator
 
-from client.response import StreamEvent, EventType, TokenUsage
+from client.response import StreamEvent, StreamEventType, TokenUsage
 
 
 def _to_token_usage(usage: Any) -> TokenUsage:
@@ -18,6 +18,17 @@ def _to_token_usage(usage: Any) -> TokenUsage:
             total_tokens=usage.total_tokens or 0,
             cached_tokens=cached_tokens or 0,
       )
+
+
+def _error_kind(exc: Exception) -> str:
+      """Classify an exception into a coarse error category."""
+      if isinstance(exc, RateLimitError):
+            return "rate_limit"
+      if isinstance(exc, APIConnectionError):
+            return "network"
+      if isinstance(exc, OpenAIError):
+            return "api"
+      return "unknown"
 
 
 class LLMClient:
@@ -66,30 +77,30 @@ class LLMClient:
                               continue
                         choice = chunk.choices[0]
                         if choice.delta.content:
-                              yield StreamEvent(type=EventType.TEXT_DELTA, text_delta=choice.delta.content)
+                              yield StreamEvent(type=StreamEventType.TEXT_DELTA, text_delta=choice.delta.content)
                         if choice.finish_reason is not None:
                               finish_reason = choice.finish_reason
                   yield StreamEvent(
-                        type=EventType.MESSAGE_COMPLETE,
+                        type=StreamEventType.MESSAGE_COMPLETE,
                         finish_reason=finish_reason,
                         usage=usage,
                   )
             except RateLimitError as exc:
-                  yield StreamEvent(type=EventType.RATE_LIMIT, error=str(exc))
+                  yield StreamEvent(type=StreamEventType.RATE_LIMIT, error=str(exc), error_kind="rate_limit")
             except Exception as exc:
-                  yield StreamEvent(type=EventType.ERROR, error=str(exc))
+                  yield StreamEvent(type=StreamEventType.ERROR, error=str(exc), error_kind=_error_kind(exc))
 
       async def non_stream_response(self, client: AsyncOpenAI, kwargs: dict[str,Any]) -> StreamEvent:
             try:
                   response = await client.chat.completions.create(**kwargs)
                   choice = response.choices[0]
                   return StreamEvent(
-                        type=EventType.MESSAGE_COMPLETE,
+                        type=StreamEventType.MESSAGE_COMPLETE,
                         text_delta=choice.message.content,
                         finish_reason=choice.finish_reason,
                         usage=_to_token_usage(response.usage),
                   )
             except RateLimitError as exc:
-                  return StreamEvent(type=EventType.RATE_LIMIT, error=str(exc))
+                  return StreamEvent(type=StreamEventType.RATE_LIMIT, error=str(exc), error_kind="rate_limit")
             except Exception as exc:
-                  return StreamEvent(type=EventType.ERROR, error=str(exc))
+                  return StreamEvent(type=StreamEventType.ERROR, error=str(exc), error_kind=_error_kind(exc))
