@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 
 class StreamEventType(str, Enum):
@@ -35,3 +36,5 @@ class StreamEvent:
       error_kind: str | None = None
       finish_reason: str | None = None
       usage: TokenUsage | None = None
+      # Assembled function calls, each a {"id", "name", "arguments"} dict.
+      tool_calls: list[dict[str, Any]] | None = None

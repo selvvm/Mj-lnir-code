@@ -73,6 +73,18 @@ async def render_response(agent: Agent, user_input: str) -> None:
                               reply += event.data.get("text", "")
                         elif event.type is AgentEventType.TEXT_COMPLETE:
                               reply = event.data.get("text", reply)
+                        elif event.type is AgentEventType.TOOL_START:
+                              name = event.data.get("name", "")
+                              args = (event.data.get("arguments") or "").strip()
+                              if len(args) > 80:
+                                    args = args[:77] + "…"
+                              console.print(Text(f"  → {name} {args}", style="cyan"))
+                        elif event.type is AgentEventType.TOOL_RESULT:
+                              name = event.data.get("name", "")
+                              if event.data.get("success"):
+                                    console.print(Text(f"  ✓ {name}", style="green"))
+                              else:
+                                    console.print(Text(f"  ✗ {name}: {event.data.get('error')}", style="red"))
                         elif event.type is AgentEventType.AGENT_ERROR:
                               kind = event.data.get("kind", "unknown")
                               color = "yellow" if kind in ("rate_limit", "network") else "red"

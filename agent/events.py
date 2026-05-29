@@ -15,6 +15,10 @@ class AgentEventType(str, Enum):
       TEXT_DELTA = "text_delta"
       TEXT_COMPLETE = "text_complete"
 
+      # Tool calls
+      TOOL_START = "tool_start"
+      TOOL_RESULT = "tool_result"
+
 
 @dataclass
 class AgentEvent:
@@ -42,4 +46,20 @@ class AgentEvent:
             return cls(
                   type=AgentEventType.TEXT_COMPLETE,
                   data={"text": text, "finish_reason": finish_reason, "usage": usage},
+            )
+
+      @classmethod
+      def tool_start(cls, name: str, arguments: str) -> AgentEvent:
+            return cls(type=AgentEventType.TOOL_START, data={"name": name, "arguments": arguments})
+
+      @classmethod
+      def tool_result(cls, name: str, result: Any) -> AgentEvent:
+            return cls(
+                  type=AgentEventType.TOOL_RESULT,
+                  data={
+                        "name": name,
+                        "success": result.success,
+                        "output": result.output,
+                        "error": result.error,
+                  },
             )
