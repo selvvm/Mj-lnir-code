@@ -20,6 +20,23 @@ def _to_token_usage(usage: Any) -> TokenUsage:
       )
 
 
+def _accumulate_tool_calls(acc: dict[int, dict[str, str]], deltas: Any) -> None:
+      """Merge a chunk's streamed tool-call deltas into `acc`, keyed by index.
+
+      The name and id arrive once; the JSON `arguments` stream in piece by piece,
+      so they are concatenated until the message completes.
+      """
+      for delta in deltas:
+            entry = acc.setdefault(delta.index, {"id": "", "name": "", "arguments": ""})
+            if delta.id:
+                  entry["id"] = delta.id
+            if delta.function is not None:
+                  if delta.function.name:
+                        entry["name"] = delta.function.name
+                  if delta.function.arguments:
+                        entry["arguments"] += delta.function.arguments
+
+
 def _error_kind(exc: Exception) -> str:
       """Classify an exception into a coarse error category."""
       if isinstance(exc, RateLimitError):
@@ -48,7 +65,7 @@ class LLMClient:
                   await self._client.close()
                   self._client = None
 
-      async def chat_completion(self, messages: list[dict[str,Any]], stream: bool = True) -> Any:
+      async def chat_completion(self, messages: list[dict[str,Any]], tools: list[dict[str,Any]] | None = None, stream: bool = True) -> Any:
        #LLM once reached context window tend to stream half response so we need to check wether actual
        #context window is reached or not
             client = self.get_client()
@@ -57,6 +74,8 @@ class LLMClient:
                   "messages": messages,
                   "stream": stream
             }
+            if tools:
+                  kwargs["tools"] = tools
 
             if stream:
                   kwargs["stream_options"] = {"include_usage": True}
@@ -70,6 +89,7 @@ class LLMClient:
                   response = await client.chat.completions.create(**kwargs)
                   finish_reason: str | None = None
                   usage: TokenUsage | None = None
+                  tool_calls: dict[int, dict[str, str]] = {}
                   async for chunk in response:
                         if chunk.usage is not None:
                               usage = _to_token_usage(chunk.usage)
@@ -78,12 +98,15 @@ class LLMClient:
                         choice = chunk.choices[0]
                         if choice.delta.content:
                               yield StreamEvent(type=StreamEventType.TEXT_DELTA, text_delta=choice.delta.content)
+                        if choice.delta.tool_calls:
+                              _accumulate_tool_calls(tool_calls, choice.delta.tool_calls)
                         if choice.finish_reason is not None:
                               finish_reason = choice.finish_reason
                   yield StreamEvent(
                         type=StreamEventType.MESSAGE_COMPLETE,
                         finish_reason=finish_reason,
                         usage=usage,
+                        tool_calls=[tool_calls[i] for i in sorted(tool_calls)] or None,
                   )
             except RateLimitError as exc:
                   yield StreamEvent(type=StreamEventType.RATE_LIMIT, error=str(exc), error_kind="rate_limit")
