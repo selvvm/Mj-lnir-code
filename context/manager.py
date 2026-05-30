@@ -5,6 +5,7 @@ from typing import Any
 
 from prompts.system import get_system_prompt
 from context.text import count_tokens
+from config.config import Config
 
 
 @dataclass
@@ -19,9 +20,10 @@ class MessageItems:
 class ContextManager:
       """Owns the agent's conversation context — the system prompt and message history."""
 
-      def __init__(self) -> None:
+      def __init__(self, config: Config | None = None) -> None:
+            self._config = config or Config()
             self.system_prompt = get_system_prompt()
-            self._model_name = "deepseek-chat"
+            self._model_name = self._config.model
             self._messages: list[MessageItems] = []
 
       def add_user_message(self, content: str) -> None:

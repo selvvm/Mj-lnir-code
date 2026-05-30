@@ -20,6 +20,8 @@ from rich.text import Text
 
 from agent.agent import Agent
 from agent.events import AgentEventType
+from agent.session import Session
+from config.config import Config
 
 load_dotenv()
 
@@ -102,7 +104,7 @@ async def render_response(agent: Agent, user_input: str) -> None:
 
 async def chat_loop() -> None:
       """Run an interactive multi-turn chat session through the Agent."""
-      agent = Agent()
+      agent = Agent(Session(Config()))
       history: InMemoryHistory = InMemoryHistory()
 
       console.print(Panel(

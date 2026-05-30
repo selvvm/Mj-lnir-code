@@ -12,6 +12,7 @@ class ToolKind(str, Enum):
       WRITE = "write"
       SHELL = "shell"
       NETWORK = "network"
+      TASK = "task"
 
 
 @dataclass
