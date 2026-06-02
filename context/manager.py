@@ -6,6 +6,7 @@ from typing import Any
 from prompts.system import get_system_prompt
 from context.text import count_tokens
 from config.config import Config
+from tools.memory import load_memory
 
 
 @dataclass
@@ -22,9 +23,23 @@ class ContextManager:
 
       def __init__(self, config: Config | None = None) -> None:
             self._config = config or Config()
-            self.system_prompt = get_system_prompt()
+            self.system_prompt = self._build_system_prompt()
             self._model_name = self._config.model
             self._messages: list[MessageItems] = []
+
+      def _build_system_prompt(self) -> str:
+            """Base prompt, plus a list of stored memory keys (the index the LLM reads)."""
+            prompt = get_system_prompt()
+            keys = list(load_memory(self._config.memory_path).keys())
+            if keys:
+                  listing = "\n".join(f"- {key}" for key in keys)
+                  prompt += (
+                        "\n\n# Memory\n"
+                        "You have persistent memory from past sessions. These keys are stored — "
+                        'use the memory tool with action "get" and a key to read its value:\n'
+                        f"{listing}"
+                  )
+            return prompt
 
       def add_user_message(self, content: str) -> None:
             item = MessageItems(

@@ -8,6 +8,14 @@ from pydantic import BaseModel, Field
 from tools.base import Tool, ToolInvocation, ToolKind, ToolResult
 
 
+def load_memory(path: Path) -> dict[str, str]:
+      """Read the persisted memory file, returning {} if it is missing or invalid."""
+      try:
+            return json.loads(path.read_text(encoding="utf-8"))
+      except (FileNotFoundError, json.JSONDecodeError):
+            return {}
+
+
 class MemoryParams(BaseModel):
       action: str = Field(..., description="Action to perform: 'set', 'get', 'delete', 'list', or 'clear'.")
       key: str | None = Field(None, description="Memory key. Required for 'set', 'get', and 'delete'.")
@@ -29,10 +37,7 @@ class MemoryTool(Tool):
             self._path = path
 
       def _load(self) -> dict[str, str]:
-            try:
-                  return json.loads(self._path.read_text(encoding="utf-8"))
-            except (FileNotFoundError, json.JSONDecodeError):
-                  return {}
+            return load_memory(self._path)
 
       def _save(self, data: dict[str, str]) -> None:
             self._path.parent.mkdir(parents=True, exist_ok=True)
