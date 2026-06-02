@@ -1,30 +1,29 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any, AsyncGenerator
 
-from client.llm_client import LLMClient
-from client.response import StreamEventType
-from context.manager import ContextManager
+from client.response import StreamEventType, TokenUsage
 from agent.events import AgentEvent
+from agent.session import Session
 from tools.base import ToolInvocation, ToolResult
-from tools.registry import ToolRegistry
 
 
 class Agent:
-      """Orchestration layer between the UI and the LLM transport.
+      """Orchestration layer between the UI and a Session.
 
-      `main.py` calls `run()`; the Agent owns the LLMClient and delegates
-      conversation state to a ContextManager, and never exposes either to the UI.
+      The Agent is the stateless loop logic; all per-conversation state — client,
+      context, tools, config — lives on the Session it is given. `main.py` calls
+      `run()`, and the Session is never exposed to the UI.
       """
 
-      def __init__(self, max_iterations: int = 10) -> None:
-            self.client = LLMClient()
-            self._context = ContextManager()
-            self._tools = ToolRegistry()
-            self._cwd = Path.cwd()
-            self._max_iterations = max_iterations
+      def __init__(self, session: Session) -> None:
+            self._session = session
+            self.client = session.client
+            self._context = session.context_manager
+            self._tools = session.tool_registry
+            self._cwd = session.cwd
+            self._max_iterations = session.config.max_iterations
 
       async def run(self, message: str) -> AsyncGenerator[AgentEvent, None]:
             """Public entry point: bracket one turn with AGENT_START / AGENT_END."""
@@ -42,7 +41,7 @@ class Agent:
             for _ in range(self._max_iterations):
                   parts: list[str] = []
                   finish_reason: str | None = None
-                  usage: object | None = None
+                  usage: TokenUsage | None = None
                   tool_calls: list[dict[str, Any]] | None = None
                   error_event: AgentEvent | None = None
 
@@ -76,6 +75,8 @@ class Agent:
                         yield error_event
                         return
 
+                  self._session.add_usage(usage)
+
                   reply = "".join(parts)
                   if tool_calls:
                         first = False
@@ -88,6 +89,7 @@ class Agent:
                         continue
 
                   self._context.add_assistant_message(reply)
+                  self._session.increment_turn()
                   yield AgentEvent.text_complete(reply, finish_reason, usage)
                   return
 

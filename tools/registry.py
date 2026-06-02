@@ -4,9 +4,12 @@ import logging
 from typing import Any
 
 from tools.base import Tool
-from tools.fetch_url import FetchUrlTool
+from tools.edit_file import EditFileTool
+from tools.grep import GrepTool
 from tools.read_file import ReadFileTool
 from tools.run_shell import RunShellTool
+from tools.web_fetch import WebFetchTool
+from tools.web_search import WebSearchTool
 from tools.write_file import WriteFileTool
 
 
@@ -14,7 +17,20 @@ logger = logging.getLogger(__name__)
 
 
 def _default_tools() -> list[Tool]:
-      return [ReadFileTool(), WriteFileTool(), RunShellTool(), FetchUrlTool()]
+      return [
+            ReadFileTool(),
+            WriteFileTool(),
+            EditFileTool(),
+            GrepTool(),
+            RunShellTool(),
+            WebSearchTool(),
+            WebFetchTool(),
+      ]
+
+
+def create_default_registry() -> "ToolRegistry":
+      """Build a registry pre-loaded with the agent's default tools."""
+      return ToolRegistry(_default_tools())
 
 
 class ToolRegistry:

@@ -1,8 +1,8 @@
-import os
 from openai import AsyncOpenAI, RateLimitError, APIConnectionError, OpenAIError
 from typing import Any, AsyncGenerator
 
 from client.response import StreamEvent, StreamEventType, TokenUsage
+from config.config import Config
 
 
 def _to_token_usage(usage: Any) -> TokenUsage:
@@ -49,14 +49,15 @@ def _error_kind(exc: Exception) -> str:
 
 
 class LLMClient:
-      def __init__(self) -> None:
+      def __init__(self, config: Config | None = None) -> None:
+            self._config = config or Config()
             self._client: AsyncOpenAI | None = None
 
       def get_client(self) -> AsyncOpenAI:
             if self._client is None:
                   self._client = AsyncOpenAI(
-                        api_key=os.getenv("DEEPSEEK_API_KEY"),
-                        base_url="https://api.deepseek.com"
+                        api_key=self._config.api_key,
+                        base_url=self._config.base_url,
                         )
             return self._client
 
@@ -70,7 +71,7 @@ class LLMClient:
        #context window is reached or not
             client = self.get_client()
             kwargs: dict[str,Any] = {
-                  "model": "deepseek-chat",
+                  "model": self._config.model,
                   "messages": messages,
                   "stream": stream
             }

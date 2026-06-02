@@ -12,6 +12,8 @@ class ToolKind(str, Enum):
       WRITE = "write"
       SHELL = "shell"
       NETWORK = "network"
+      TASK = "task"
+      MEMORY = "memory"
 
 
 @dataclass
@@ -20,6 +22,14 @@ class ToolResult:
       output: str
       error: str | None = None
       metadata: dict[str, Any] = field(default_factory=dict)
+
+      @classmethod
+      def success_result(cls, output: str, metadata: dict[str, Any] | None = None) -> ToolResult:
+            return cls(success=True, output=output, metadata=metadata or {})
+
+      @classmethod
+      def error_result(cls, error: str, metadata: dict[str, Any] | None = None) -> ToolResult:
+            return cls(success=False, output="", error=error, metadata=metadata or {})
 
 
 @dataclass
