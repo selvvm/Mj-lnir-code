@@ -18,6 +18,7 @@ class Config:
       model: str = "deepseek-chat"
       max_iterations: int = 10
       cwd: Path = field(default_factory=Path.cwd)
+      memory_path: Path = field(default_factory=lambda: Path.home() / ".ai_coding_agent" / "memory.json")
 
       # USD per 1M tokens. Defaults are DeepSeek deepseek-chat list prices;
       # override them if pricing changes or for a different model.
@@ -29,3 +30,4 @@ class Config:
             if self.api_key is None:
                   self.api_key = os.getenv("DEEPSEEK_API_KEY")
             self.cwd = Path(self.cwd).resolve()
+            self.memory_path = Path(self.memory_path)

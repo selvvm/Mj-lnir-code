@@ -7,6 +7,7 @@ from client.llm_client import LLMClient
 from client.response import TokenUsage
 from config.config import Config
 from context.manager import ContextManager
+from tools.memory import MemoryTool
 from tools.registry import create_default_registry
 from tools.todo import TodosTool
 
@@ -27,9 +28,10 @@ class Session:
             self.cwd = config.cwd
 
             # The todos tool owns its task list; the per-session registry keeps it
-            # scoped to this session.
+            # scoped to this session. Memory persists to disk across sessions.
             self.tool_registry = create_default_registry()
             self.tool_registry.register(TodosTool())
+            self.tool_registry.register(MemoryTool(config.memory_path))
 
             self.session_id = str(uuid.uuid4())
             self.created_at = datetime.now()
