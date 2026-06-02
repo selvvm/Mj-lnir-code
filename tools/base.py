@@ -14,6 +14,7 @@ class ToolKind(str, Enum):
       NETWORK = "network"
       TASK = "task"
       MEMORY = "memory"
+      AGENT = "agent"
 
 
 @dataclass

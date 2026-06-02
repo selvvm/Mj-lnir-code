@@ -19,6 +19,9 @@ class AgentEventType(str, Enum):
       TOOL_START = "tool_start"
       TOOL_RESULT = "tool_result"
 
+      # Context management
+      CONTEXT_PRUNED = "context_pruned"
+
 
 @dataclass
 class AgentEvent:
@@ -51,6 +54,13 @@ class AgentEvent:
       @classmethod
       def tool_start(cls, name: str, arguments: str) -> AgentEvent:
             return cls(type=AgentEventType.TOOL_START, data={"name": name, "arguments": arguments})
+
+      @classmethod
+      def context_pruned(cls, dropped: int, total_tokens: int) -> AgentEvent:
+            return cls(
+                  type=AgentEventType.CONTEXT_PRUNED,
+                  data={"dropped": dropped, "total_tokens": total_tokens},
+            )
 
       @classmethod
       def tool_result(cls, name: str, result: Any) -> AgentEvent:
