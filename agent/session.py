@@ -8,7 +8,7 @@ from client.response import TokenUsage
 from config.config import Config
 from context.manager import ContextManager
 from tools.registry import create_default_registry
-from tools.todo import TodoStore, TodosTool
+from tools.todo import TodosTool
 
 
 class Session:
@@ -26,10 +26,10 @@ class Session:
             self.context_manager = ContextManager(config=config)
             self.cwd = config.cwd
 
-            # Todos are session state; the tool is bound to this session's store.
-            self.todos = TodoStore()
+            # The todos tool owns its task list; the per-session registry keeps it
+            # scoped to this session.
             self.tool_registry = create_default_registry()
-            self.tool_registry.register(TodosTool(self.todos))
+            self.tool_registry.register(TodosTool())
 
             self.session_id = str(uuid.uuid4())
             self.created_at = datetime.now()
