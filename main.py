@@ -68,13 +68,28 @@ async def render_response(agent: Agent, user_input: str) -> None:
             console=console,
             refresh_per_second=12,
             transient=True,
-      ):
+      ) as live:
+            async def approve(confirmation) -> bool:
+                  """Pause the spinner, ask the user to allow a tool, then resume."""
+                  live.stop()
+                  console.print(Text(f"⚠  {confirmation.tool_name} wants to run:", style="yellow"))
+                  console.print(Text(f"   {confirmation.params}", style="dim"))
+                  answer = await asyncio.to_thread(console.input, "   Allow? [y/N] ")
+                  live.start()
+                  return answer.strip().lower() in ("y", "yes")
+
+            agent.approval_callback = approve
             try:
                   async for event in agent.run(user_input):
                         if event.type is AgentEventType.TEXT_DELTA:
                               reply += event.data.get("text", "")
                         elif event.type is AgentEventType.TEXT_COMPLETE:
                               reply = event.data.get("text", reply)
+                        elif event.type is AgentEventType.CONTEXT_PRUNED:
+                              console.print(Text(
+                                    f"  …pruned {event.data['dropped']} old message(s) to fit context",
+                                    style="dim",
+                              ))
                         elif event.type is AgentEventType.TOOL_START:
                               name = event.data.get("name", "")
                               args = (event.data.get("arguments") or "").strip()

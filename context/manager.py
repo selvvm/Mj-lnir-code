@@ -28,18 +28,10 @@ class ContextManager:
             self._messages: list[MessageItems] = []
 
       def _build_system_prompt(self) -> str:
-            """Base prompt, plus a list of stored memory keys (the index the LLM reads)."""
-            prompt = get_system_prompt()
+            """Base prompt with live config, plus the stored memory keys (the index)."""
             keys = list(load_memory(self._config.memory_path).keys())
-            if keys:
-                  listing = "\n".join(f"- {key}" for key in keys)
-                  prompt += (
-                        "\n\n# Memory\n"
-                        "You have persistent memory from past sessions. These keys are stored — "
-                        'use the memory tool with action "get" and a key to read its value:\n'
-                        f"{listing}"
-                  )
-            return prompt
+            user_memory = "\n".join(f"- {key}" for key in keys) if keys else None
+            return get_system_prompt(self._config, user_memory=user_memory)
 
       def add_user_message(self, content: str) -> None:
             item = MessageItems(
@@ -77,6 +69,29 @@ class ContextManager:
             """Remove the most recent message (used to discard a failed turn)."""
             if self._messages:
                   self._messages.pop()
+
+      def total_tokens(self) -> int:
+            """Approximate tokens for the whole context: system prompt + all messages."""
+            return count_tokens(self.system_prompt, self._model_name) + sum(
+                  m.token_count for m in self._messages
+            )
+
+      def prune(self) -> int:
+            """Drop oldest messages until under the context budget; return how many.
+
+            Stops dropping once the front is no longer a `tool` message, so a tool
+            result is never left without the assistant tool-call that produced it
+            (which the API would reject).
+            """
+            budget = self._config.max_context_tokens
+            dropped = 0
+            while self.total_tokens() > budget and len(self._messages) > 1:
+                  self._messages.pop(0)
+                  dropped += 1
+            while self._messages and self._messages[0].role == "tool":
+                  self._messages.pop(0)
+                  dropped += 1
+            return dropped
 
       def get_messages(self) -> list[dict[str, Any]]:
             """Return system prompt + history as role/content dicts for the LLM."""

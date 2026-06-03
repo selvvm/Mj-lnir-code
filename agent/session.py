@@ -9,6 +9,7 @@ from config.config import Config
 from context.manager import ContextManager
 from tools.memory import MemoryTool
 from tools.registry import create_default_registry
+from tools.subagent import CodeExplorerTool, CodeReviewerTool
 from tools.todo import TodosTool
 
 
@@ -32,6 +33,8 @@ class Session:
             self.tool_registry = create_default_registry()
             self.tool_registry.register(TodosTool())
             self.tool_registry.register(MemoryTool(config.memory_path))
+            self.tool_registry.register(CodeExplorerTool(config))
+            self.tool_registry.register(CodeReviewerTool(config))
 
             self.session_id = str(uuid.uuid4())
             self.created_at = datetime.now()

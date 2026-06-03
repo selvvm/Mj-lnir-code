@@ -1,12 +1,21 @@
 from __future__ import annotations
 
+import os
+import platform
+from datetime import datetime
 
-def get_system_prompt() -> str:
+from config.config import Config
+
+
+def get_system_prompt(config: Config, user_memory: str | None = None) -> str:
       """Assemble the full system prompt from its sections."""
       parts = []
 
       # Identity and role
       parts.append(_get_identity_section())
+
+      # Live environment (date, OS, working directory, shell)
+      parts.append(_get_environment_section(config))
 
       # AGENTS.md spec
       parts.append(_get_agents_md_section())
@@ -16,6 +25,16 @@ def get_system_prompt() -> str:
 
       # Operational guidelines
       parts.append(_get_operational_section())
+
+      # Optional developer- and user-supplied instructions
+      if config.developer_instructions:
+            parts.append(_get_developer_instructions_section(config.developer_instructions))
+      if config.user_instructions:
+            parts.append(_get_user_instructions_section(config.user_instructions))
+
+      # Persistent memory keys, when any are stored
+      if user_memory:
+            parts.append(_get_memory_section(user_memory))
 
       return "\n\n".join(parts)
 
@@ -27,6 +46,28 @@ def _get_identity_section() -> str:
 You are a coding agent running in a terminal. You help the user with software
 engineering tasks on their local codebase: reading files, writing and editing
 code, running commands, and explaining your work clearly and concisely."""
+
+
+def _get_environment_section(config: Config) -> str:
+      """Generate the environment section with live runtime context."""
+      now = datetime.now()
+      os_info = f"{platform.system()} {platform.release()}"
+      return f"""# Environment
+
+- **Current Date**: {now.strftime("%A, %B %d, %Y")}
+- **Operating System**: {os_info}
+- **Working Directory**: {config.cwd}
+- **Shell**: {_get_shell_info()}
+
+The user has granted you access to run tools (reading and editing files, running
+shell commands, searching and fetching the web) in service of their request. Use
+them when they help, and prefer acting over asking when the next step is clear."""
+
+
+def _get_shell_info() -> str:
+      """Return the basename of the user's shell, or 'unknown'."""
+      shell = os.environ.get("SHELL", "")
+      return os.path.basename(shell) if shell else "unknown"
 
 
 def _get_agents_md_section() -> str:
@@ -64,3 +105,26 @@ If completing the user's task requires writing or modifying files, your code and
 - Do not waste tokens by re-reading files after calling `apply_patch` on them. The patch is already applied.
 - Do not add inline comments within code unless explicitly requested.
 - Do not use one-letter variable names unless explicitly requested."""
+
+
+def _get_developer_instructions_section(instructions: str) -> str:
+      """Generate the developer-supplied instructions section."""
+      return f"""# Developer Instructions
+
+{instructions}"""
+
+
+def _get_user_instructions_section(instructions: str) -> str:
+      """Generate the user-supplied instructions section."""
+      return f"""# User Instructions
+
+{instructions}"""
+
+
+def _get_memory_section(user_memory: str) -> str:
+      """Generate the persistent-memory section listing stored keys."""
+      return f"""# Memory
+
+You have persistent memory from past sessions. These keys are stored — use the
+memory tool with action "get" and a key to read its value:
+{user_memory}"""

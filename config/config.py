@@ -17,8 +17,12 @@ class Config:
       base_url: str = "https://api.deepseek.com"
       model: str = "deepseek-chat"
       max_iterations: int = 10
+      max_context_tokens: int = 64000
+      auto_approve: bool = False
       cwd: Path = field(default_factory=Path.cwd)
       memory_path: Path = field(default_factory=lambda: Path.home() / ".ai_coding_agent" / "memory.json")
+      developer_instructions: str | None = None
+      user_instructions: str | None = None
 
       # USD per 1M tokens. Defaults are DeepSeek deepseek-chat list prices;
       # override them if pricing changes or for a different model.

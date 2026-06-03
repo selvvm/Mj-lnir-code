@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import json
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Awaitable, Callable
 
 from client.response import StreamEventType, TokenUsage
 from agent.events import AgentEvent
 from agent.session import Session
-from tools.base import ToolInvocation, ToolResult
+from tools.base import ToolConfirmation, ToolInvocation, ToolKind, ToolResult
+
+# Tool kinds that change the world and so require user approval before running.
+_APPROVAL_KINDS = {ToolKind.WRITE, ToolKind.SHELL}
+
+ApprovalCallback = Callable[[ToolConfirmation], Awaitable[bool]]
 
 
 class Agent:
@@ -17,13 +22,16 @@ class Agent:
       `run()`, and the Session is never exposed to the UI.
       """
 
-      def __init__(self, session: Session) -> None:
+      def __init__(self, session: Session, approval_callback: ApprovalCallback | None = None) -> None:
             self._session = session
+            self._config = session.config
             self.client = session.client
             self._context = session.context_manager
             self._tools = session.tool_registry
             self._cwd = session.cwd
             self._max_iterations = session.config.max_iterations
+            # Set by the UI; awaited before a world-changing tool runs.
+            self.approval_callback = approval_callback
 
       async def run(self, message: str) -> AsyncGenerator[AgentEvent, None]:
             """Public entry point: bracket one turn with AGENT_START / AGENT_END."""
@@ -44,6 +52,11 @@ class Agent:
                   usage: TokenUsage | None = None
                   tool_calls: list[dict[str, Any]] | None = None
                   error_event: AgentEvent | None = None
+
+                  # Keep the context under budget before each call.
+                  dropped = self._context.prune()
+                  if dropped:
+                        yield AgentEvent.context_pruned(dropped, self._context.total_tokens())
 
                   try:
                         stream = await self.client.chat_completion(
@@ -106,10 +119,26 @@ class Agent:
                   params = json.loads(call["arguments"] or "{}")
             except json.JSONDecodeError as exc:
                   return ToolResult(success=False, output="", error=f"Invalid tool arguments: {exc}")
+
+            if self._needs_approval(tool):
+                  confirmation = ToolConfirmation(
+                        tool_name=tool.name, params=params, description=tool.description
+                  )
+                  if not await self.approval_callback(confirmation):
+                        return ToolResult(success=False, output="", error="User denied this tool call.")
+
             try:
                   return await tool.execute(ToolInvocation(params=params, cwd=self._cwd))
             except Exception as exc:
                   return ToolResult(success=False, output="", error=f"Tool raised: {exc}")
+
+      def _needs_approval(self, tool: Any) -> bool:
+            """A world-changing tool needs approval unless auto-approve is on or no UI can ask."""
+            return (
+                  tool.kind in _APPROVAL_KINDS
+                  and not self._config.auto_approve
+                  and self.approval_callback is not None
+            )
 
       async def close(self) -> None:
             """Release the underlying LLM client."""
