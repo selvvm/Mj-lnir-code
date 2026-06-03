@@ -87,3 +87,23 @@ for approval. Use `↑`/`↓` for history and `exit` / `Ctrl+C` to quit.
 Behavior is configured through `Config` in `config/config.py` — model, API
 endpoint, context budget, approval mode, memory location, and pricing. To use a
 different provider, point `base_url` and `model` at any OpenAI-compatible API.
+
+## Security
+
+This agent can read and modify files, run shell commands, and fetch from the
+internet on your behalf. A few things to be aware of:
+
+- **Shell and file-writing tools run real commands** against your machine.
+  Write and shell tools ask for confirmation before running (disable with
+  `auto_approve`), so review prompts before approving.
+- **Subagents run autonomously.** A subagent (e.g. `code_reviewer`) can run its
+  allowed tools, including shell, *without* a separate approval prompt — so be
+  cautious running untrusted prompts.
+- **Memory is stored in plaintext** at `~/.ai_coding_agent/memory.json`.
+- Keep your API key in `.env` (gitignored) and never commit it.
+
+Run it on code and in environments you trust.
+
+## License
+
+[MIT](LICENSE)
