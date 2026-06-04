@@ -114,7 +114,7 @@ async def render_response(agent: Agent, user_input: str) -> None:
       if error_renderable is not None:
             console.print(error_renderable)
       else:
-            console.print(Group(Text("✻ DeepSeek", style="bold green"), Markdown(reply)))
+            console.print(Group(Text("✻ Mjolnir", style="bold green"), Markdown(reply)))
 
 
 async def chat_loop() -> None:
@@ -125,7 +125,7 @@ async def chat_loop() -> None:
       console.print(Panel(
             "[bold]✻ Mjolnir coding agent[/bold]\n"
             "[dim]Type a message and press Enter · ↑↓ for history · 'exit' or Ctrl+C to quit[/dim]",
-            title="DeepSeek CLI",
+            title="Mjolnir",
             title_align="left",
             box=box.ROUNDED,
             border_style="cyan",
@@ -152,7 +152,7 @@ async def chat_loop() -> None:
 
 @click.command()
 def cli() -> None:
-      """Interactive DeepSeek chat in your terminal."""
+      """Interactive Mjolnir coding agent in your terminal."""
       asyncio.run(chat_loop())
 
 
